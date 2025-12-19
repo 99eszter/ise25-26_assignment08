@@ -173,4 +173,82 @@ public class ReviewServiceTest {
         // then
         assertTrue(updatedReview.approved());
     }
+
+    // >>>>>>>>>>>>>>>>>>>>> NEUER TEST <<<<<<<<<<<<<<<<<<<<
+    @Test
+    void createReviewSuccessfully() {
+        // given
+        Review review = TestFixtures.getReviewFixtures().getFirst();
+        Pos pos = review.pos();
+        User author = review.author();
+
+        assertNotNull(pos.getId());
+        when(posDataService.getById(pos.getId())).thenReturn(pos);
+        when(reviewDataService.filter(pos, author)).thenReturn(List.of());
+        when(reviewDataService.upsert(any(Review.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        Review savedReview = reviewService.upsert(review);
+
+        // then
+        verify(posDataService).getById(pos.getId());
+        verify(reviewDataService).filter(pos, author);
+        verify(reviewDataService).upsert(review);
+        assertThat(savedReview).isEqualTo(review);
+    }
+
+    // >>>>>>>>>>>>>>>>>>>>> NEUER TEST <<<<<<<<<<<<<<<<<<<<
+    @Test
+    void approvalDoesNotReachQuorum() {
+        // given
+        Review review = TestFixtures.getReviewFixtures().getFirst().toBuilder()
+                .approvalCount(0)
+                .approved(false)
+                .build();
+
+        User user = TestFixtures.getUserFixtures().getLast();
+
+        when(userDataService.getById(user.getId())).thenReturn(user);
+        when(reviewDataService.getById(review.getId())).thenReturn(review);
+        when(reviewDataService.upsert(any(Review.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // when
+        Review result = reviewService.approve(review, user.getId());
+
+        // then
+        verify(userDataService).getById(user.getId());
+        verify(reviewDataService).getById(review.getId());
+        verify(reviewDataService).upsert(any(Review.class));
+        assertFalse(result.approved());
+        assertThat(result.approvalCount()).isEqualTo(1);
+    }
+
+    // >>>>>>>>>>>>>>>>>>>>> NEUER TEST <<<<<<<<<<<<<<<<<<<<
+    @Test
+    void getUnapprovedByPos() {
+        // given
+        Pos pos = TestFixtures.getPosFixtures().getFirst();
+        assertNotNull(pos.getId());
+
+        List<Review> reviews = TestFixtures.getReviewFixtures().stream()
+                .map(review -> review.toBuilder()
+                        .pos(pos)
+                        .approved(false)
+                        .build())
+                .toList();
+
+        when(posDataService.getById(pos.getId())).thenReturn(pos);
+        when(reviewDataService.filter(pos, false)).thenReturn(reviews);
+
+        // when
+        List<Review> result = reviewService.filter(pos.getId(), false);
+
+        // then
+        verify(posDataService).getById(pos.getId());
+        verify(reviewDataService).filter(pos, false);
+        assertThat(result).hasSize(reviews.size());
+    }
+
+
 }
