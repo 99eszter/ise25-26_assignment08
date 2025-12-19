@@ -249,6 +249,4 @@ public class ReviewServiceTest {
         verify(reviewDataService).filter(pos, false);
         assertThat(result).hasSize(reviews.size());
     }
-
-
 }
